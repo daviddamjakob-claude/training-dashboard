@@ -201,6 +201,46 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 .filter-btn{font-size:12px;padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all 0.15s;font-family:'DM Mono',monospace}
 .filter-btn.active{background:var(--text);color:var(--bg);border-color:var(--text)}
 
+/* Gallery overlay */
+#gallery-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:flex-end;justify-content:center}
+#gallery-overlay.open{display:flex}
+#gallery-modal{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-md)}
+.gallery-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
+.gallery-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.gallery-race-name{font-size:15px;font-weight:500}
+.gallery-close{font-size:16px;color:var(--muted);padding:4px 8px;border-radius:6px;line-height:1}
+.gallery-close:hover{background:var(--surface2);color:var(--text)}
+.gallery-body{flex:1;overflow-y:auto;padding:16px 20px 24px}
+.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.gallery-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;background:var(--surface2)}
+.gallery-thumb img{width:100%;height:100%;object-fit:cover;transition:opacity 0.15s;display:block}
+.gallery-thumb:hover img{opacity:0.85}
+.gallery-thumb-del{position:absolute;top:5px;right:5px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s}
+.gallery-thumb:hover .gallery-thumb-del{opacity:1}
+.gallery-empty{grid-column:1/-1;text-align:center;padding:32px 16px;color:var(--muted);font-size:13px}
+.gallery-empty-icon{font-size:32px;margin-bottom:10px}
+.gallery-drop-area{border:2px dashed var(--border2);border-radius:var(--radius-lg);padding:22px 16px;text-align:center;cursor:pointer;transition:all 0.15s;display:block}
+.gallery-drop-area:hover,.gallery-drop-area.drag{border-color:var(--text);background:var(--surface2)}
+.gallery-drop-area input{display:none}
+.gallery-drop-label{font-size:13px;color:var(--muted);line-height:1.7}
+.gallery-drop-label strong{color:var(--text)}
+.gallery-drop-icon{font-size:22px;margin-bottom:6px}
+.upload-queue{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.upload-item{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.upload-item-name{flex:0 0 auto;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-bar{flex:1;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.upload-bar-fill{height:100%;background:#FC4C02;border-radius:2px;transition:width 0.15s}
+/* Lightbox */
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:300;align-items:center;justify-content:center}
+#lightbox.open{display:flex}
+#lightbox img{max-width:100%;max-height:100%;object-fit:contain}
+#lightbox-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s}
+#lightbox-close:hover{background:rgba(255,255,255,0.28)}
+/* Hyrox card clickable */
+.hyrox-card{cursor:pointer;transition:box-shadow 0.15s,transform 0.15s}
+.hyrox-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+@media(max-width:700px){.gallery-thumb-del{opacity:1}}
+
 /* Responsive */
 @media(max-width:1000px){
   #sidebar{width:180px;min-width:180px}
@@ -368,6 +408,32 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
       <div id="dd-content"></div>
     </div>
   </main>
+</div>
+
+<!-- Gallery overlay -->
+<div id="gallery-overlay">
+  <div id="gallery-modal">
+    <div class="gallery-handle"></div>
+    <div class="gallery-header">
+      <div class="gallery-race-name" id="gallery-title"></div>
+      <button class="gallery-close" id="gallery-close-btn">✕</button>
+    </div>
+    <div class="gallery-body">
+      <div id="gallery-grid" class="gallery-grid"></div>
+      <label class="gallery-drop-area" id="gallery-drop-area">
+        <input type="file" id="gallery-file-input" accept="image/*" multiple>
+        <div class="gallery-drop-icon">📷</div>
+        <div class="gallery-drop-label"><strong>Tap to add photos</strong><br>or drag and drop here</div>
+      </label>
+      <div id="upload-queue" class="upload-queue"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <button id="lightbox-close">✕</button>
+  <img id="lightbox-img" src="" alt="">
 </div>
 
 <!-- Bottom tab bar (mobile) -->
@@ -945,7 +1011,7 @@ function renderHyrox() {
   const grid = document.getElementById('hyrox-cards');
   grid.innerHTML = HYROX_DATA.map(r => {
     if(r.target) return `
-      <div class="hyrox-card target">
+      <div class="hyrox-card target" data-race="${r.name}">
         <div class="hyrox-race-name">${r.name}</div>
         <div class="hyrox-date">${r.date}</div>
         <div class="hyrox-time target">${r.time}</div>
@@ -959,7 +1025,7 @@ function renderHyrox() {
       </div>
     `;
     return `
-      <div class="hyrox-card ${r.pb?'pb':''}">
+      <div class="hyrox-card ${r.pb?'pb':''}" data-race="${r.name}">
         <div class="hyrox-race-name">${r.name}</div>
         <div class="hyrox-date">${r.date}</div>
         <div class="hyrox-time ${r.pb?'pb':''}">${r.time}</div>
@@ -1070,6 +1136,11 @@ function renderHyrox() {
     });
   }
 
+  // Card click → gallery
+  grid.querySelectorAll('.hyrox-card').forEach(card=>{
+    card.addEventListener('click', ()=>openGallery(card.dataset.race));
+  });
+
   // Run comparison
   destroyChart('chart-runs');
   const ctxR = document.getElementById('chart-runs');
@@ -1109,6 +1180,129 @@ function renderHyrox() {
     });
   }
 }
+
+// ── Photo gallery ─────────────────────────────────────────────────────────────
+const CLOUDINARY_CLOUD = 'dglx8phdf';
+const CLOUDINARY_PRESET = 'claude_strava_dashboard';
+let currentGalleryRace = null;
+
+function galleryKey(race){ return 'gallery_'+race; }
+function loadPhotos(race){ const r=store.get(galleryKey(race)); return r?JSON.parse(r):[]; }
+function savePhotos(race,photos){ store.set(galleryKey(race),JSON.stringify(photos)); }
+
+function openGallery(raceName){
+  currentGalleryRace = raceName;
+  document.getElementById('gallery-title').textContent = raceName + ' — Photos';
+  document.getElementById('gallery-file-input').value = '';
+  document.getElementById('upload-queue').innerHTML = '';
+  renderGalleryGrid();
+  document.getElementById('gallery-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeGallery(){
+  document.getElementById('gallery-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  currentGalleryRace = null;
+}
+
+function renderGalleryGrid(){
+  const photos = loadPhotos(currentGalleryRace);
+  const grid = document.getElementById('gallery-grid');
+  if(!photos.length){
+    grid.innerHTML = `<div class="gallery-empty"><div class="gallery-empty-icon">📷</div>No photos yet — add your first one below</div>`;
+    return;
+  }
+  grid.innerHTML = photos.map((p,i)=>{
+    const thumb = `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/w_400,h_400,c_fill/${p.public_id}`;
+    return `<div class="gallery-thumb" data-url="${p.secure_url}">
+      <img src="${thumb}" loading="lazy" alt="Race photo">
+      <button class="gallery-thumb-del" data-index="${i}" title="Delete">✕</button>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.gallery-thumb').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.closest('.gallery-thumb-del')) return;
+      openLightbox(el.dataset.url);
+    });
+  });
+  grid.querySelectorAll('.gallery-thumb-del').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const photos = loadPhotos(currentGalleryRace);
+      photos.splice(+btn.dataset.index, 1);
+      savePhotos(currentGalleryRace, photos);
+      renderGalleryGrid();
+    });
+  });
+}
+
+function openLightbox(url){
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox(){
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
+}
+
+async function uploadPhoto(file){
+  return new Promise((resolve,reject)=>{
+    const xhr = new XMLHttpRequest();
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', CLOUDINARY_PRESET);
+
+    const queue = document.getElementById('upload-queue');
+    const item = document.createElement('div');
+    item.className = 'upload-item';
+    item.innerHTML = `<span class="upload-item-name">${file.name}</span><div class="upload-bar"><div class="upload-bar-fill" style="width:0%"></div></div>`;
+    queue.appendChild(item);
+    const fill = item.querySelector('.upload-bar-fill');
+
+    xhr.upload.onprogress = e=>{ if(e.lengthComputable) fill.style.width=(e.loaded/e.total*100)+'%'; };
+    xhr.onload = ()=>{
+      if(xhr.status===200){
+        fill.style.width='100%';
+        setTimeout(()=>item.remove(), 700);
+        resolve(JSON.parse(xhr.responseText));
+      } else { item.remove(); reject(new Error('Upload failed '+xhr.status)); }
+    };
+    xhr.onerror = ()=>{ item.remove(); reject(new Error('Network error')); };
+    xhr.open('POST',`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`);
+    xhr.send(fd);
+  });
+}
+
+async function handleFiles(files){
+  if(!files.length || !currentGalleryRace) return;
+  for(const file of Array.from(files)){
+    try {
+      const res = await uploadPhoto(file);
+      const photos = loadPhotos(currentGalleryRace);
+      photos.push({public_id:res.public_id, secure_url:res.secure_url});
+      savePhotos(currentGalleryRace, photos);
+      renderGalleryGrid();
+    } catch(e){ console.error('Upload error:', e); }
+  }
+}
+
+// Gallery events
+document.getElementById('gallery-close-btn').addEventListener('click', closeGallery);
+document.getElementById('gallery-overlay').addEventListener('click', e=>{
+  if(e.target.id==='gallery-overlay') closeGallery();
+});
+const galleryFileInput = document.getElementById('gallery-file-input');
+galleryFileInput.addEventListener('change', ()=>handleFiles(galleryFileInput.files));
+const dropArea = document.getElementById('gallery-drop-area');
+dropArea.addEventListener('dragover', e=>{ e.preventDefault(); dropArea.classList.add('drag'); });
+dropArea.addEventListener('dragleave', ()=>dropArea.classList.remove('drag'));
+dropArea.addEventListener('drop', e=>{ e.preventDefault(); dropArea.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+
+// Lightbox events
+document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+document.getElementById('lightbox').addEventListener('click', e=>{ if(e.target.id==='lightbox') closeLightbox(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeLightbox(); closeGallery(); } });
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 let currentView = 'overview';
