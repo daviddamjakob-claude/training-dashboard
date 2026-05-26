@@ -47,7 +47,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 /* Layout */
 #app{display:flex;min-height:100vh}
 #sidebar{width:216px;min-width:216px;background:var(--surface);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
-#main{flex:1;max-width:1080px;padding:40px 48px;overflow-x:hidden}
+#main{flex:1;max-width:1080px;padding:40px 48px;overflow-x:clip}
 .sidebar-logo{padding:0 20px 24px;font-size:15px;font-weight:600;letter-spacing:-0.01em;color:var(--text)}
 .sidebar-logo span{color:#FC4C02}
 .nav-item{display:flex;align-items:center;gap:10px;padding:8px 20px;font-size:12.5px;color:var(--muted);cursor:pointer;transition:color 0.15s,background 0.15s;border-radius:0;position:relative}
@@ -120,8 +120,10 @@ tbody tr:hover{background:var(--surface2)}
 td.mono{font-family:'DM Mono',monospace;font-size:12px}
 
 /* Period pills */
-.period-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px}
-.period-pill{font-size:12px;padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all 0.15s;font-family:'DM Mono',monospace}
+.pills-sticky{position:sticky;top:0;z-index:10;background:var(--bg);padding:14px 0 10px;margin-bottom:4px}
+.period-pills{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+.period-pills::-webkit-scrollbar{display:none}
+.period-pill{font-size:12px;padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all 0.15s;font-family:'DM Mono',monospace;white-space:nowrap;flex-shrink:0}
 .period-pill.active{background:var(--text);color:var(--bg);border-color:var(--text)}
 
 /* Week/month stat row */
@@ -256,7 +258,7 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
       <div class="goals-grid">
         <div class="goal-card done">
           <div class="goal-title">Half Marathon</div>
-          <div class="goal-target">Target: sub 1:30</div>
+          <div class="goal-target">Target: sub 1:25:00</div>
           <div class="goal-result done">1:22:00</div>
           <span class="goal-badge done">✓ Done</span>
         </div>
@@ -275,12 +277,7 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
       </div>
 
       <div class="section-label">Year to date</div>
-      <div class="metric-grid">
-        <div class="metric-card"><div class="metric-label">Sessions</div><div class="metric-value" id="m-sessions">—</div></div>
-        <div class="metric-card"><div class="metric-label">Total Time</div><div class="metric-value" id="m-time">—</div><div class="metric-sub">hours</div></div>
-        <div class="metric-card"><div class="metric-label">Running</div><div class="metric-value" id="m-run">—</div><div class="metric-sub">km</div></div>
-        <div class="metric-card"><div class="metric-label">Riding</div><div class="metric-value" id="m-ride">—</div><div class="metric-sub">km</div></div>
-      </div>
+      <div class="metric-grid" id="m-grid"></div>
 
       <div class="chart-card">
         <div class="chart-header">
@@ -313,7 +310,9 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
     <!-- By Week -->
     <div id="view-week" class="view" style="display:none">
       <div class="page-title">By Week</div>
-      <div id="week-pills" class="period-pills"></div>
+      <div class="pills-sticky">
+        <div id="week-pills" class="period-pills"></div>
+      </div>
       <div id="week-stats" class="period-stats"></div>
       <div id="week-chips" class="type-chips"></div>
       <div class="table-wrap"><table><thead id="week-thead"></thead><tbody id="week-tbody"></tbody></table></div>
@@ -322,7 +321,9 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
     <!-- By Month -->
     <div id="view-month" class="view" style="display:none">
       <div class="page-title">By Month</div>
-      <div id="month-pills" class="period-pills"></div>
+      <div class="pills-sticky">
+        <div id="month-pills" class="period-pills"></div>
+      </div>
       <div id="month-stats" class="period-stats"></div>
       <div id="month-chips" class="type-chips"></div>
       <div class="table-wrap"><table><thead id="month-thead"></thead><tbody id="month-tbody"></tbody></table></div>
@@ -338,6 +339,8 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
         <button class="filter-btn" data-type="HIIT">HIIT</button>
         <button class="filter-btn" data-type="Swim">Swim</button>
       </div>
+      <div id="all-stats" class="period-stats"></div>
+      <div id="all-chips" class="type-chips"></div>
       <div class="table-wrap"><table><thead id="all-thead"></thead><tbody id="all-tbody"></tbody></table></div>
     </div>
 
@@ -593,9 +596,17 @@ function buildStackedBar(canvasId, labels, datasets, opts={}) {
     },
     options: {
       responsive:true, maintainAspectRatio:true,
-      plugins: { legend:{display:false}, tooltip:{callbacks:{
-        label(ctx){ const v=ctx.raw; return opts.isVolume ? ` ${fmtDuration(v)}` : ` ${v} sessions`; }
-      }}},
+      interaction: { mode:'nearest', intersect:true },
+      plugins: {
+        legend:{
+          display:true,
+          labels:{color:'#6b7280',font:{size:11},boxWidth:12,padding:16}
+        },
+        tooltip:{callbacks:{
+          title(items){ return items[0]?.dataset?.label || ''; },
+          label(ctx){ const v=ctx.raw; return opts.isVolume ? ` ${fmtDuration(v)}` : ` ${v} sessions`; }
+        }}
+      },
       scales: {
         x: { stacked:true, grid:{display:false}, ticks:{color:'#9ca3af',font:{size:10}} },
         y: { stacked:true, display:false, max:yMax }
@@ -654,15 +665,18 @@ let sessionsChartPeriod = 'month';
 let volumeChartPeriod = 'month';
 
 function renderOverview() {
-  // Metrics
-  const types = ['Run','Ride','HIIT','Swim'];
-  const totalMins = activities.reduce((s,a)=>s+a.duration,0);
-  const runKm = activities.filter(a=>a.type==='Run').reduce((s,a)=>s+a.distKm,0);
-  const rideKm = activities.filter(a=>a.type==='Ride').reduce((s,a)=>s+a.distKm,0);
-  document.getElementById('m-sessions').textContent = activities.length;
-  document.getElementById('m-time').textContent = fmtHours(totalMins);
-  document.getElementById('m-run').textContent = runKm.toFixed(0);
-  document.getElementById('m-ride').textContent = rideKm.toFixed(0);
+  // Per-type metric cards
+  const typeList = ['Run','Ride','HIIT','Swim'];
+  document.getElementById('m-grid').innerHTML = typeList.map(t => {
+    const acts = activities.filter(a=>a.type===t);
+    const hours = fmtHours(acts.reduce((s,a)=>s+a.duration,0));
+    return `
+      <div class="metric-card">
+        <div class="metric-label">${t}</div>
+        <div class="metric-value">${acts.length}</div>
+        <div class="metric-sub">${hours}h</div>
+      </div>`;
+  }).join('');
 
   // Hyrox goal
   const bestHyrox = 63; // Barcelona 1:03:35 = 63.58 min
@@ -826,6 +840,8 @@ function initMonthView() {
 let allFilter = 'All';
 function renderAllActivities() {
   const filtered = allFilter==='All' ? activities : activities.filter(a=>a.type===allFilter);
+  periodStats(filtered, 'all-stats');
+  typeChips(filtered, 'all-chips');
   const sorted = [...filtered].sort((a,b)=>a.date.localeCompare(b.date));
   document.getElementById('all-thead').innerHTML = `<tr><th>Day</th><th>Date</th><th>Type</th><th>Name</th><th>Duration</th><th>Distance</th><th>HR</th></tr>`;
   const tbody = document.getElementById('all-tbody');
@@ -1034,7 +1050,12 @@ function renderHyrox() {
       },
       options:{
         responsive:true, maintainAspectRatio:true,
-        plugins:{ legend:{display:true, labels:{color:'#6b7280',font:{size:11},boxWidth:12}} },
+        plugins:{
+          legend:{display:true, labels:{color:'#6b7280',font:{size:11},boxWidth:12}},
+          tooltip:{callbacks:{
+            label(ctx){ const v=ctx.raw,m=Math.floor(v/60),s=Math.round(v%60).toString().padStart(2,'0'); return ` ${ctx.dataset.label}: ${m}:${s}`; }
+          }}
+        },
         scales:{
           x:{ grid:{display:false}, ticks:{color:'#9ca3af',font:{size:10}} },
           y:{
@@ -1068,7 +1089,12 @@ function renderHyrox() {
       },
       options:{
         responsive:true, maintainAspectRatio:true,
-        plugins:{ legend:{display:true, labels:{color:'#6b7280',font:{size:11},boxWidth:12}} },
+        plugins:{
+          legend:{display:true, labels:{color:'#6b7280',font:{size:11},boxWidth:12}},
+          tooltip:{callbacks:{
+            label(ctx){ const v=ctx.raw,m=Math.floor(v/60),s=Math.round(v%60).toString().padStart(2,'0'); return ` ${ctx.dataset.label}: ${m}:${s}`; }
+          }}
+        },
         scales:{
           x:{ grid:{display:false}, ticks:{color:'#9ca3af',font:{size:10}} },
           y:{
