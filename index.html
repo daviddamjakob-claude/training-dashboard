@@ -74,6 +74,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow)}
 .metric-label{font-size:9px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted2);margin-bottom:6px}
 .metric-value{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--text)}
+.metric-unit{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:400;color:var(--muted);margin-left:3px}
 .metric-sub{font-size:11px;color:var(--muted);margin-top:2px}
 
 /* Goal cards */
@@ -197,7 +198,8 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 .storage-banner{background:#fffbeb;border:1px solid #fde68a;border-radius:var(--radius);padding:10px 16px;font-size:12px;color:#b45309;margin-bottom:16px}
 
 /* Type filter buttons */
-.filter-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.filter-sticky{position:sticky;top:0;z-index:10;background:var(--bg);padding:14px 0 10px;margin-bottom:4px}
+.filter-btns{display:flex;gap:6px;flex-wrap:wrap}
 .filter-btn{font-size:12px;padding:5px 12px;border-radius:100px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all 0.15s;font-family:'DM Mono',monospace}
 .filter-btn.active{background:var(--text);color:var(--bg);border-color:var(--text)}
 
@@ -236,6 +238,12 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 #lightbox img{max-width:100%;max-height:100%;object-fit:contain}
 #lightbox-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s}
 #lightbox-close:hover{background:rgba(255,255,255,0.28)}
+#lightbox-prev,#lightbox-next{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;user-select:none}
+#lightbox-prev{left:16px}
+#lightbox-next{right:16px}
+#lightbox-prev:hover,#lightbox-next:hover{background:rgba(255,255,255,0.28)}
+#lightbox-counter{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.7);font-size:12px;font-family:'DM Mono',monospace}
+@media(max-width:700px){#lightbox-prev{left:8px}#lightbox-next{right:8px}}
 /* Hyrox card clickable */
 .hyrox-card{cursor:pointer;transition:box-shadow 0.15s,transform 0.15s}
 .hyrox-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
@@ -372,12 +380,14 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
     <!-- All Activities -->
     <div id="view-all" class="view" style="display:none">
       <div class="page-title">All Activities</div>
-      <div class="filter-btns" id="all-filters">
-        <button class="filter-btn active" data-type="All">All</button>
-        <button class="filter-btn" data-type="Run">Run</button>
-        <button class="filter-btn" data-type="Ride">Ride</button>
-        <button class="filter-btn" data-type="HIIT">HIIT</button>
-        <button class="filter-btn" data-type="Swim">Swim</button>
+      <div class="filter-sticky">
+        <div class="filter-btns" id="all-filters">
+          <button class="filter-btn active" data-type="All">All</button>
+          <button class="filter-btn" data-type="Run">Run</button>
+          <button class="filter-btn" data-type="Ride">Ride</button>
+          <button class="filter-btn" data-type="HIIT">HIIT</button>
+          <button class="filter-btn" data-type="Swim">Swim</button>
+        </div>
       </div>
       <div id="all-stats" class="period-stats"></div>
       <div id="all-chips" class="type-chips"></div>
@@ -433,7 +443,10 @@ td.mono{font-family:'DM Mono',monospace;font-size:12px}
 <!-- Lightbox -->
 <div id="lightbox">
   <button id="lightbox-close">✕</button>
+  <button id="lightbox-prev">‹</button>
   <img id="lightbox-img" src="" alt="">
+  <button id="lightbox-next">›</button>
+  <div id="lightbox-counter"></div>
 </div>
 
 <!-- Bottom tab bar (mobile) -->
@@ -739,8 +752,8 @@ function renderOverview() {
     return `
       <div class="metric-card">
         <div class="metric-label">${t}</div>
-        <div class="metric-value">${acts.length}</div>
-        <div class="metric-sub">${hours}h</div>
+        <div class="metric-value">${acts.length}<span class="metric-unit">sessions</span></div>
+        <div class="metric-sub">${hours}h <span class="metric-unit">training hours</span></div>
       </div>`;
   }).join('');
 
@@ -880,6 +893,7 @@ function initWeekView() {
     });
   });
   if(latest) renderWeek(latest);
+  setTimeout(()=>{ pills.scrollLeft = pills.scrollWidth; }, 0);
 }
 
 function initMonthView() {
@@ -900,6 +914,7 @@ function initMonthView() {
     });
   });
   if(latest) renderMonth(latest);
+  setTimeout(()=>{ pills.scrollLeft = pills.scrollWidth; }, 0);
 }
 
 // ── All activities view ───────────────────────────────────────────────────────
@@ -1220,10 +1235,10 @@ function renderGalleryGrid(){
       <button class="gallery-thumb-del" data-index="${i}" title="Delete">✕</button>
     </div>`;
   }).join('');
-  grid.querySelectorAll('.gallery-thumb').forEach(el=>{
+  grid.querySelectorAll('.gallery-thumb').forEach((el,i)=>{
     el.addEventListener('click', e=>{
       if(e.target.closest('.gallery-thumb-del')) return;
-      openLightbox(el.dataset.url);
+      openLightbox(loadPhotos(currentGalleryRace), i);
     });
   });
   grid.querySelectorAll('.gallery-thumb-del').forEach(btn=>{
@@ -1237,13 +1252,29 @@ function renderGalleryGrid(){
   });
 }
 
-function openLightbox(url){
-  document.getElementById('lightbox-img').src = url;
+let lbPhotos = [];
+let lbIndex = 0;
+
+function openLightbox(photos, index){
+  lbPhotos = photos;
+  lbIndex = index;
+  showLightboxPhoto();
   document.getElementById('lightbox').classList.add('open');
 }
 function closeLightbox(){
   document.getElementById('lightbox').classList.remove('open');
   document.getElementById('lightbox-img').src = '';
+}
+function showLightboxPhoto(){
+  document.getElementById('lightbox-img').src = lbPhotos[lbIndex].secure_url;
+  const nav = lbPhotos.length > 1;
+  document.getElementById('lightbox-prev').style.display = nav ? 'flex' : 'none';
+  document.getElementById('lightbox-next').style.display = nav ? 'flex' : 'none';
+  document.getElementById('lightbox-counter').textContent = nav ? `${lbIndex+1} / ${lbPhotos.length}` : '';
+}
+function navigateLightbox(dir){
+  lbIndex = (lbIndex + dir + lbPhotos.length) % lbPhotos.length;
+  showLightboxPhoto();
 }
 
 async function uploadPhoto(file){
@@ -1301,8 +1332,26 @@ dropArea.addEventListener('drop', e=>{ e.preventDefault(); dropArea.classList.re
 
 // Lightbox events
 document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+document.getElementById('lightbox-prev').addEventListener('click', ()=>navigateLightbox(-1));
+document.getElementById('lightbox-next').addEventListener('click', ()=>navigateLightbox(1));
 document.getElementById('lightbox').addEventListener('click', e=>{ if(e.target.id==='lightbox') closeLightbox(); });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeLightbox(); closeGallery(); } });
+
+// Swipe support
+let _tx = 0, _ty = 0;
+document.getElementById('lightbox').addEventListener('touchstart', e=>{ _tx=e.touches[0].clientX; _ty=e.touches[0].clientY; },{passive:true});
+document.getElementById('lightbox').addEventListener('touchend', e=>{
+  const dx=e.changedTouches[0].clientX-_tx, dy=e.changedTouches[0].clientY-_ty;
+  if(Math.abs(dx)>Math.abs(dy) && Math.abs(dx)>40) navigateLightbox(dx<0?1:-1);
+},{passive:true});
+
+// Keyboard
+document.addEventListener('keydown', e=>{
+  if(document.getElementById('lightbox').classList.contains('open')){
+    if(e.key==='ArrowLeft') navigateLightbox(-1);
+    if(e.key==='ArrowRight') navigateLightbox(1);
+  }
+  if(e.key==='Escape'){ closeLightbox(); closeGallery(); }
+});
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 let currentView = 'overview';
